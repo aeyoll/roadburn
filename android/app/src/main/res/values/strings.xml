@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">roadburn</string>
-    <string name="title_activity_main">roadburn</string>
+    <string name="app_name">Roadburn</string>
+    <string name="title_activity_main">Roadburn</string>
     <string name="package_name">in.bidega.roadburn</string>
     <string name="custom_url_scheme">in.bidega.roadburn</string>
 </resources>
