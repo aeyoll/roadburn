@@ -116,6 +116,7 @@ import {
 import type { Day, Stage, Gig, Artist, BookmarkStatus } from '@/types/festival';
 import { fetchFestivalDashboard } from '@/services/api';
 import { initBookmarks, getBookmark, getBookmarkColor } from '@/services/bookmarks';
+import { syncGigReminders } from '@/services/gigNotifications';
 import GigDetailModal from '@/components/GigDetailModal.vue';
 
 const PIXELS_PER_MINUTE = 2.2;
@@ -253,7 +254,11 @@ async function openGigDetail(gig: Gig) {
   const artist = artists.value.find((a) => a.id === gig.artistId);
   const modal = await modalController.create({
     component: GigDetailModal,
-    componentProps: { gig, artist },
+    componentProps: {
+      gig,
+      artist,
+      onBookmarksChanged: () => syncGigReminders(gigs.value),
+    },
   });
 
   await modal.present();
@@ -279,6 +284,8 @@ async function loadData() {
     if (days.value.length > 0) {
       selectedDayId.value = days.value[0].id;
     }
+
+    await syncGigReminders(gigs.value);
   } catch (e) {
     error.value = 'Failed to load festival data. Please try again.';
     console.error(e);

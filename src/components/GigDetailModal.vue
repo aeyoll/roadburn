@@ -101,6 +101,7 @@ import { getBookmark, setBookmark, getBookmarkLabel } from '@/services/bookmarks
 const props = defineProps<{
   gig: Gig;
   artist: Artist | undefined;
+  onBookmarksChanged?: () => Promise<void>;
 }>();
 
 const currentBookmark = ref<BookmarkStatus>(getBookmark(props.gig.id));
@@ -122,6 +123,8 @@ async function onBookmark(status: BookmarkStatus) {
     currentBookmark.value = status;
     await setBookmark(props.gig.id, status);
   }
+
+  await props.onBookmarksChanged?.();
 }
 
 function dismiss() {
