@@ -113,13 +113,13 @@ const bookmarkOptions: Array<{ status: BookmarkStatus; label: string; color: str
   { status: 'mandatory', label: 'Mandatory', color: 'primary' },
 ];
 
-function onBookmark(status: BookmarkStatus) {
+async function onBookmark(status: BookmarkStatus) {
   if (currentBookmark.value === status) {
     currentBookmark.value = 'none';
-    setBookmark(props.gig.id, 'none');
+    await setBookmark(props.gig.id, 'none');
   } else {
     currentBookmark.value = status;
-    setBookmark(props.gig.id, status);
+    await setBookmark(props.gig.id, status);
   }
 }
 

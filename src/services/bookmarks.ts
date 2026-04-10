@@ -1,37 +1,38 @@
+import { Preferences } from '@capacitor/preferences';
 import type { BookmarkStatus } from '@/types/festival';
 
 const STORAGE_KEY = 'roadburn-bookmarks';
 
-function loadBookmarks(): Record<number, BookmarkStatus> {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+let cache: Record<number, BookmarkStatus> = {};
 
-    return raw ? JSON.parse(raw) : {};
+export async function initBookmarks(): Promise<void> {
+  try {
+    const { value } = await Preferences.get({ key: STORAGE_KEY });
+    cache = value ? JSON.parse(value) : {};
   } catch {
-    return {};
+    cache = {};
   }
 }
 
-function saveBookmarks(bookmarks: Record<number, BookmarkStatus>): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(bookmarks));
+async function persistBookmarks(): Promise<void> {
+  await Preferences.set({
+    key: STORAGE_KEY,
+    value: JSON.stringify(cache),
+  });
 }
 
 export function getBookmark(gigId: number): BookmarkStatus {
-  const bookmarks = loadBookmarks();
-
-  return bookmarks[gigId] ?? 'none';
+  return cache[gigId] ?? 'none';
 }
 
-export function setBookmark(gigId: number, status: BookmarkStatus): void {
-  const bookmarks = loadBookmarks();
-
+export async function setBookmark(gigId: number, status: BookmarkStatus): Promise<void> {
   if (status === 'none') {
-    delete bookmarks[gigId];
+    delete cache[gigId];
   } else {
-    bookmarks[gigId] = status;
+    cache[gigId] = status;
   }
 
-  saveBookmarks(bookmarks);
+  await persistBookmarks();
 }
 
 export function getBookmarkColor(status: BookmarkStatus): string {

@@ -121,7 +121,7 @@ import {
 } from '@ionic/vue';
 import type { Day, Stage, Gig, Artist, BookmarkStatus } from '@/types/festival';
 import { fetchFestivalDashboard } from '@/services/api';
-import { getBookmark, getBookmarkColor } from '@/services/bookmarks';
+import { initBookmarks, getBookmark, getBookmarkColor } from '@/services/bookmarks';
 import GigDetailModal from '@/components/GigDetailModal.vue';
 
 const PIXELS_PER_MINUTE = 2;
@@ -276,7 +276,7 @@ async function loadData() {
   error.value = null;
 
   try {
-    const data = await fetchFestivalDashboard();
+    const [data] = await Promise.all([fetchFestivalDashboard(), initBookmarks()]);
     days.value = data.days.sort((a, b) => a.sortOrder - b.sortOrder);
     stages.value = data.stages.sort((a, b) => a.sortOrder - b.sortOrder);
     gigs.value = data.gigs;
