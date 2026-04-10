@@ -1,0 +1,7 @@
+{
+  "name": "roadburn",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "vue-vite"
+}
