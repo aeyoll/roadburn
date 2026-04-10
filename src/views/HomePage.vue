@@ -449,7 +449,7 @@ onMounted(() => {
 }
 
 .timetable-gridline {
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
   left: 0;
   position: absolute;
   right: 0;
@@ -462,9 +462,9 @@ onMounted(() => {
 }
 
 .timetable-gig {
-  background: rgba(255, 255, 255, 0.06);
-  border: none;
-  border-left: 3px solid transparent;
+  background: #0f0f0f;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-left: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 6px;
   box-sizing: border-box;
   color: var(--ion-text-color, #f0f0f5);
@@ -492,23 +492,24 @@ onMounted(() => {
 
 .timetable-gig--bookmark-danger {
   border-left-color: var(--ion-color-danger, #ef5350);
+  border-left-width: 3px;
 }
 
 .timetable-gig--bookmark-warning {
   border-left-color: var(--ion-color-warning, #ffb300);
+  border-left-width: 3px;
 }
 
 .timetable-gig--bookmark-success {
   border-left-color: var(--ion-color-success, #4caf50);
+  border-left-width: 3px;
 }
 
 .timetable-gig--bookmark-tertiary {
   border-left-color: var(--ion-color-tertiary, #42a5f5);
+  border-left-width: 3px;
 }
 
-.timetable-gig--bookmark-medium {
-  border-left-color: transparent;
-}
 
 .timetable-gig-title {
   font-size: 11px;
