@@ -119,7 +119,7 @@ import { initBookmarks, getBookmark, getBookmarkColor } from '@/services/bookmar
 import { syncGigReminders } from '@/services/gigNotifications';
 import GigDetailModal from '@/components/GigDetailModal.vue';
 
-const PIXELS_PER_MINUTE = 2.2;
+const PIXELS_PER_MINUTE = 2;
 const SLOT_INTERVAL = 30;
 const stageColumnWidth = 150;
 
