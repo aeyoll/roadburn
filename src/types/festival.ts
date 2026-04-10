@@ -55,6 +55,7 @@ export interface FestivalDashboard {
   id: number;
   title: string;
   displayDate: string;
+  ticketUrl: string | null;
   imageUrl: string | null;
   iconUrl: string | null;
   backgroundImageUrl: string | null;

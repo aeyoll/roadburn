@@ -44,7 +44,7 @@ export function getBookmarkColor(status: BookmarkStatus): string {
     case 'yes':
       return 'success';
     case 'mandatory':
-      return 'primary';
+      return 'tertiary';
     default:
       return 'medium';
   }

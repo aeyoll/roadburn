@@ -4,24 +4,21 @@
       <ion-toolbar>
         <ion-title>Roadburn 2026</ion-title>
       </ion-toolbar>
-      <ion-toolbar>
-        <ion-segment
-          :value="selectedDayId"
-          @ion-change="onDayChange"
-          scrollable
-        >
-          <ion-segment-button
+      <ion-toolbar class="day-toolbar">
+        <div class="day-pills" role="tablist" aria-label="Select day">
+          <button
             v-for="day in days"
             :key="day.id"
-            :value="day.id"
+            role="tab"
+            class="day-pill"
+            :class="{ 'day-pill-active': day.id === selectedDayId }"
+            :aria-selected="day.id === selectedDayId"
+            @click="selectDay(day.id)"
           >
-            <ion-label>
-              <strong>{{ day.titleShort }}</strong>
-              <br />
-              {{ day.subtitleShort }}
-            </ion-label>
-          </ion-segment-button>
-        </ion-segment>
+            <span class="day-pill-name">{{ day.titleShort }}</span>
+            <span class="day-pill-date">{{ day.subtitleShort }}</span>
+          </button>
+        </div>
       </ion-toolbar>
     </ion-header>
 
@@ -77,16 +74,16 @@
               </div>
 
               <div
-                v-for="(stage, colIndex) in activeStages"
+                v-for="(stage, stageIdx) in activeStages"
                 :key="stage.id"
                 class="timetable-lane"
-                :style="{ left: colIndex * stageColumnWidth + 'px', width: stageColumnWidth + 'px' }"
+                :style="{ left: stageIdx * stageColumnWidth + 'px', width: stageColumnWidth + 'px' }"
               >
                 <button
                   v-for="gig in gigsForStage(stage.id)"
                   :key="gig.id"
                   class="timetable-gig"
-                  :class="'timetable-gig--' + getGigBookmarkColor(gig.id)"
+                  :class="'timetable-gig--bookmark-' + getGigBookmarkColor(gig.id)"
                   :style="gigStyle(gig)"
                   :aria-label="gig.title + ' at ' + stage.title + ', ' + gig.displayDate"
                   @click="openGigDetail(gig)"
@@ -111,9 +108,6 @@ import {
   IonToolbar,
   IonTitle,
   IonContent,
-  IonSegment,
-  IonSegmentButton,
-  IonLabel,
   IonSpinner,
   IonText,
   IonButton,
@@ -124,9 +118,9 @@ import { fetchFestivalDashboard } from '@/services/api';
 import { initBookmarks, getBookmark, getBookmarkColor } from '@/services/bookmarks';
 import GigDetailModal from '@/components/GigDetailModal.vue';
 
-const PIXELS_PER_MINUTE = 2;
+const PIXELS_PER_MINUTE = 2.2;
 const SLOT_INTERVAL = 30;
-const stageColumnWidth = 140;
+const stageColumnWidth = 150;
 
 const loading = ref(true);
 const error = ref<string | null>(null);
@@ -251,8 +245,8 @@ function formatTime(timestamp: number): string {
   });
 }
 
-function onDayChange(event: CustomEvent) {
-  selectedDayId.value = Number(event.detail.value);
+function selectDay(dayId: number) {
+  selectedDayId.value = dayId;
 }
 
 async function openGigDetail(gig: Gig) {
@@ -299,6 +293,61 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.day-toolbar {
+  --background: var(--ion-background-color, #121220);
+  --border-width: 0;
+  --padding-start: 0;
+  --padding-end: 0;
+}
+
+.day-pills {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 4px 12px 10px;
+  scrollbar-width: none;
+}
+
+.day-pills::-webkit-scrollbar {
+  display: none;
+}
+
+.day-pill {
+  align-items: center;
+  background: var(--ion-color-light, #2a2a3e);
+  border: 2px solid transparent;
+  border-radius: 10px;
+  color: var(--ion-text-color, #f0f0f5);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: 1px;
+  padding: 8px 16px;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.day-pill:focus-visible {
+  outline: 2px solid var(--ion-color-primary);
+  outline-offset: 2px;
+}
+
+.day-pill-active {
+  background: var(--ion-color-primary);
+  border-color: var(--ion-color-primary);
+}
+
+.day-pill-name {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.day-pill-date {
+  font-size: 10px;
+  opacity: 0.8;
+}
+
 .timetable-spinner {
   display: block;
   margin: 40vh auto 0;
@@ -329,26 +378,28 @@ onMounted(() => {
 }
 
 .timetable-time-header {
-  background: var(--ion-color-dark, #222);
+  background: var(--ion-toolbar-background, #1a1a2e);
   flex-shrink: 0;
-  min-width: 60px;
+  min-width: 54px;
   position: sticky;
   left: 0;
   z-index: 5;
 }
 
 .timetable-stage-header {
-  background: var(--ion-color-dark, #222);
+  background: var(--ion-toolbar-background, #1a1a2e);
   box-sizing: border-box;
-  color: var(--ion-color-dark-contrast, #fff);
+  color: var(--ion-text-color, #f0f0f5);
   flex-shrink: 0;
-  font-size: 12px;
-  font-weight: 600;
-  min-width: 140px;
-  padding: 10px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  min-width: 150px;
+  padding: 10px 6px;
   text-align: center;
+  text-transform: uppercase;
   white-space: nowrap;
-  width: 140px;
+  width: 150px;
 }
 
 .timetable-body {
@@ -357,9 +408,9 @@ onMounted(() => {
 }
 
 .timetable-time-column {
-  background: var(--ion-background-color, #fff);
+  background: var(--ion-background-color, #121220);
   flex-shrink: 0;
-  min-width: 60px;
+  min-width: 54px;
   position: sticky;
   left: 0;
   z-index: 2;
@@ -367,9 +418,10 @@ onMounted(() => {
 
 .timetable-time-marker {
   box-sizing: border-box;
+  color: var(--ion-color-medium, #6b6b80);
   font-size: 11px;
-  font-weight: 500;
-  padding: 0 8px;
+  font-weight: 600;
+  padding: 0 6px;
   position: absolute;
   text-align: right;
   transform: translateY(-50%);
@@ -390,7 +442,7 @@ onMounted(() => {
 }
 
 .timetable-gridline {
-  border-top: 1px solid var(--ion-color-light, #e0e0e0);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
   left: 0;
   position: absolute;
   right: 0;
@@ -403,56 +455,66 @@ onMounted(() => {
 }
 
 .timetable-gig {
-  background: var(--ion-color-light, #f0f0f0);
-  border: 2px solid transparent;
+  background: rgba(255, 255, 255, 0.06);
+  border: none;
+  border-left: 3px solid transparent;
   border-radius: 6px;
   box-sizing: border-box;
+  color: var(--ion-text-color, #f0f0f5);
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  left: 2px;
+  justify-content: center;
+  left: 3px;
   overflow: hidden;
-  padding: 4px 6px;
+  padding: 4px 8px;
   position: absolute;
-  right: 2px;
+  right: 3px;
   text-align: left;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.timetable-gig:active {
+  transform: scale(0.97);
 }
 
 .timetable-gig:focus-visible {
-  outline: 2px solid var(--ion-color-primary, #3880ff);
-  outline-offset: 2px;
+  outline: 2px solid var(--ion-color-primary, #e53935);
+  outline-offset: 1px;
 }
 
-.timetable-gig--danger {
-  border-color: var(--ion-color-danger, #eb445a);
+.timetable-gig--bookmark-danger {
+  border-left-color: var(--ion-color-danger, #ef5350);
 }
 
-.timetable-gig--warning {
-  border-color: var(--ion-color-warning, #ffc409);
+.timetable-gig--bookmark-warning {
+  border-left-color: var(--ion-color-warning, #ffb300);
 }
 
-.timetable-gig--success {
-  border-color: var(--ion-color-success, #2dd36f);
+.timetable-gig--bookmark-success {
+  border-left-color: var(--ion-color-success, #4caf50);
 }
 
-.timetable-gig--primary {
-  border-color: var(--ion-color-primary, #3880ff);
+.timetable-gig--bookmark-tertiary {
+  border-left-color: var(--ion-color-tertiary, #42a5f5);
 }
 
-.timetable-gig--medium {
-  border-color: transparent;
+.timetable-gig--bookmark-medium {
+  border-left-color: transparent;
 }
 
 .timetable-gig-title {
   font-size: 11px;
   font-weight: 600;
-  line-height: 1.2;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .timetable-gig-time {
-  color: var(--ion-color-medium, #999);
   font-size: 10px;
   line-height: 1.2;
+  opacity: 0.7;
 }
 
 .sr-only {
