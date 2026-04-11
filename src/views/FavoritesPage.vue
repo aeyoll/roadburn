@@ -110,20 +110,7 @@ import GigDetailModal from '@/components/GigDetailModal.vue';
 
 const PIXELS_PER_MINUTE = 2;
 const SLOT_INTERVAL = 30;
-const stageColumnSizes = [
-  {
-    left: 60,
-    width: (window.innerWidth * 0.45) - (60 * 0.45),
-  },
-  {
-    left: 60 + (window.innerWidth * 0.45) - (60 * 0.45),
-    width: (window.innerWidth * 0.3) - (60 * 0.3),
-  },
-  {
-    left: 60 + (window.innerWidth * 0.75) - (60 * 0.75),
-    width: (window.innerWidth * 0.25) - (60 * 0.25),
-  },
-]; // 60px for time column
+const totalColumnWidth = window.innerWidth - 60; // 60px for time column
 
 const loading = ref(true);
 const error = ref<string | null>(null);
@@ -220,48 +207,21 @@ function timestampToPixels(timestamp: number): number {
 }
 
 function gigFavStyle(gig: Gig): Record<string, string> {
-  const { concurrentCount, concurrentIndex } = getConcurrentColumns(gig);
-  const statusIndex = ['mandatory', 'yes', 'maybe'].indexOf(getBookmark(gig.id));
+  const { total, index } = getConcurrentColumns(gig);
   const top = timestampToPixels(gig.startTimestamp);
   const height = timestampToPixels(gig.endTimestamp) - top;
-  const statuxColumnSize = stageColumnSizes[statusIndex];
 
   return {
-    left: statuxColumnSize.left + (statuxColumnSize.width / concurrentCount * concurrentIndex) + 'px',
+    left: 60 + (index * (totalColumnWidth / total)) + 'px',
     top: top + 'px',
-    width: (statuxColumnSize.width / concurrentCount) + 'px',
+    width: (totalColumnWidth / total) + 'px',
     height: height + 'px',
   };
 }
 
-function getConcurrentColumns(gig: Gig): { concurrentCount: number; concurrentIndex: number } {
-  const status = getBookmark(gig.id);
-  const sameStatusGigs = favsGigsForDay.value
-    .filter((favGigForDay) => getBookmark(favGigForDay.id) === status)
-    .sort((a, b) => a.startTimestamp - b.startTimestamp || a.endTimestamp - b.endTimestamp);
-
-  const columns: Array<{ end: number }> = [];
-  const assignment = new Map<number, number>();
-
-  for (const candidate of sameStatusGigs) {
-    let assigned = false;
-
-    for (let columnIndex = 0; columnIndex < columns.length; columnIndex++) {
-      if (columns[columnIndex].end <= candidate.startTimestamp) {
-        columns[columnIndex].end = candidate.endTimestamp;
-        assignment.set(candidate.id, columnIndex);
-        assigned = true;
-        break;
-      }
-    }
-
-    if (!assigned) {
-      assignment.set(candidate.id, columns.length);
-      columns.push({ end: candidate.endTimestamp });
-    }
-  }
-
-  const overlappingGigs = sameStatusGigs
+function getConcurrentColumns(gig: Gig): { total: number; index: number } {
+  const priorityOrder = ['mandatory', 'yes', 'maybe', 'no', 'none'];
+  const overlappingGigs = favsGigsForDay.value
     .filter((favGigForDay) =>
       favGigForDay.startTimestamp < gig.endTimestamp
       && favGigForDay.endTimestamp > gig.startTimestamp
@@ -275,16 +235,29 @@ function getConcurrentColumns(gig: Gig): { concurrentCount: number; concurrentIn
   events.sort((a, b) => a.time - b.time || a.delta - b.delta);
 
   let active = 0;
-  let count = 0;
+  let total = 0;
 
   for (const event of events) {
     active += event.delta;
-    count = Math.max(count, active);
+    total = Math.max(total, active);
   }
 
+  const sortedByPriority = overlappingGigs
+    .slice()
+    .sort((a, b) => {
+      const priorityDifference = priorityOrder.indexOf(getBookmark(a.id)) - priorityOrder.indexOf(getBookmark(b.id));
+      if (priorityDifference !== 0) {
+        return priorityDifference;
+      }
+      if (a.startTimestamp !== b.startTimestamp) {
+        return a.startTimestamp - b.startTimestamp;
+      }
+      return a.endTimestamp - b.endTimestamp;
+    });
+
   return {
-    concurrentCount: Math.max(1, count),
-    concurrentIndex: assignment.get(gig.id) ?? 0,
+    total: Math.max(1, total),
+    index: sortedByPriority.findIndex((candidate) => candidate.id === gig.id) ?? 0,
   };
 }
 
