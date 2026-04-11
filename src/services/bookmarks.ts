@@ -45,7 +45,9 @@ async function persistBookmarks(): Promise<void> {
 }
 
 export function getBookmark(gigId: number): BookmarkStatus {
-  return cache[gigId] ?? 'none';
+//   return cache[gigId] ?? 'none';
+  const statuses: BookmarkStatus[] = ['none', 'no', 'no', 'no', 'maybe', 'yes', 'mandatory'];
+  return statuses[gigId%statuses.length] || 'none';
 }
 
 export async function setBookmark(gigId: number, status: BookmarkStatus): Promise<void> {

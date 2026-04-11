@@ -20,6 +20,11 @@ const routes: Array<RouteRecordRaw> = [
         component: () => import('@/views/HomePage.vue'),
       },
       {
+        path: 'favorites',
+        name: 'Favorites',
+        component: () => import('@/views/FavoritesPage.vue'),
+      },
+      {
         path: 'lineup',
         name: 'Lineup',
         component: () => import('@/views/LineupPage.vue'),
