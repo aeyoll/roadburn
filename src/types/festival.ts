@@ -51,10 +51,12 @@ export interface Gig {
 
 export interface RenderedGig {
   gig: Gig;
-  left: number;
-  top: number;
-  width: number;
-  height: number;
+  style: {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  };
 }
 
 export interface FavGig {
