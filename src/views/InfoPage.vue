@@ -49,7 +49,7 @@
         <ion-item button @click="exportBookmarks">
           <ion-icon :icon="downloadOutline" slot="start" aria-hidden="true" />
           <ion-label>
-            <h2>Export bookmarks</h2>
+            <h2>Export bookmarks and notes</h2>
             <p>Save a JSON file to Files or Downloads</p>
           </ion-label>
         </ion-item>
@@ -57,7 +57,7 @@
         <ion-item button @click="triggerImportPicker">
           <ion-icon :icon="cloudUploadOutline" slot="start" aria-hidden="true" />
           <ion-label>
-            <h2>Import bookmarks</h2>
+            <h2>Import bookmarks and notes</h2>
             <p>Restore from a previously exported JSON file</p>
           </ion-label>
         </ion-item>
@@ -135,6 +135,7 @@ import {
   initBookmarks,
   validateBookmarksImportFile,
 } from '@/services/bookmarks';
+import { initGigNotes } from '@/services/gigNotes';
 
 const festivalData = ref<FestivalDashboard | null>(null);
 const artistCount = ref(0);
@@ -187,11 +188,11 @@ async function exportBookmarks() {
       anchor.rel = 'noopener';
       anchor.click();
       URL.revokeObjectURL(url);
-      showToast('Bookmark file downloaded.', 'success');
+      showToast('Bookmarks and notes file downloaded.', 'success');
     }
   } catch (e) {
     console.error(e);
-    showToast('Could not export bookmarks. Please try again.', 'danger');
+    showToast('Could not export bookmarks and notes. Please try again.', 'danger');
   }
 }
 
@@ -230,9 +231,9 @@ async function onImportFileSelected(event: Event) {
   }
 
   const alert = await alertController.create({
-    header: 'Replace all bookmarks?',
+    header: 'Replace bookmarks and notes?',
     message:
-      'This will remove every bookmark on this device and replace them with the ones from this file.',
+      'This will remove every bookmarks and notes on this device and replace them with the ones from this file.',
     buttons: [
       {
         text: 'Cancel',
@@ -244,7 +245,7 @@ async function onImportFileSelected(event: Event) {
         handler: async () => {
           try {
             await importBookmarksFromJson(text);
-            showToast('Bookmarks imported.', 'success');
+            showToast('Bookmarks and notes imported.', 'success');
           } catch (err) {
             const message =
               err instanceof BookmarksImportError ? err.message : 'Import failed.';
@@ -260,6 +261,7 @@ async function onImportFileSelected(event: Event) {
 
 onMounted(() => {
   void initBookmarks();
+  void initGigNotes();
   loadData();
 });
 </script>

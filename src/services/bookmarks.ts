@@ -1,10 +1,12 @@
 import { Preferences } from '@capacitor/preferences';
 import type { BookmarkStatus } from '@/types/festival';
+import { GIG_NOTE_MAX_LENGTH, getNotesForExport, replaceAllGigNotesFromImport } from '@/services/gigNotes';
 
 const STORAGE_KEY = 'roadburn-bookmarks';
 
 const BOOKMARK_EXPORT_FORMAT = 'roadburn-bookmarks' as const;
-const BOOKMARK_EXPORT_VERSION = 1 as const;
+const BOOKMARK_EXPORT_VERSION = 2 as const;
+const BOOKMARK_EXPORT_VERSION_LEGACY = 1 as const;
 
 const VALID_STATUSES: BookmarkStatus[] = ['none', 'no', 'maybe', 'yes', 'mandatory'];
 
@@ -102,10 +104,13 @@ export function buildBookmarksExportJson(): string {
     }
   }
 
+  const notes = getNotesForExport();
+
   const payload = {
     bookmarks,
     exportedAt: new Date().toISOString(),
     format: BOOKMARK_EXPORT_FORMAT,
+    notes,
     version: BOOKMARK_EXPORT_VERSION,
   };
 
@@ -119,7 +124,49 @@ export class BookmarksImportError extends Error {
   }
 }
 
-function parseBookmarksImportPayload(text: string): Record<number, BookmarkStatus> {
+interface ParsedBookmarksImport {
+  bookmarks: Record<number, BookmarkStatus>;
+  fileVersion: typeof BOOKMARK_EXPORT_VERSION | typeof BOOKMARK_EXPORT_VERSION_LEGACY;
+  notes: Record<number, string>;
+}
+
+function parseNotesImport(raw: unknown): Record<number, string> {
+  if (raw === undefined) {
+    return {};
+  }
+
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new BookmarksImportError('Invalid notes data in file.');
+  }
+
+  const next: Record<number, string> = {};
+
+  for (const [key, value] of Object.entries(raw)) {
+    if (!/^\d+$/.test(key)) {
+      throw new BookmarksImportError(`Invalid gig id in notes: ${key}`);
+    }
+
+    const gigId = Number(key);
+
+    if (!Number.isInteger(gigId) || gigId < 1) {
+      throw new BookmarksImportError(`Invalid gig id in notes: ${key}`);
+    }
+
+    if (typeof value !== 'string') {
+      throw new BookmarksImportError(`Invalid note text for gig ${key}.`);
+    }
+
+    const trimmed = value.trim().slice(0, GIG_NOTE_MAX_LENGTH);
+
+    if (trimmed !== '') {
+      next[gigId] = trimmed;
+    }
+  }
+
+  return next;
+}
+
+function parseBookmarksImportPayload(text: string): ParsedBookmarksImport {
   let parsed: unknown;
 
   try {
@@ -138,9 +185,17 @@ function parseBookmarksImportPayload(text: string): Record<number, BookmarkStatu
     throw new BookmarksImportError('This file is not a Roadburn bookmarks export.');
   }
 
-  if (record.version !== BOOKMARK_EXPORT_VERSION) {
+  if (
+    record.version !== BOOKMARK_EXPORT_VERSION &&
+    record.version !== BOOKMARK_EXPORT_VERSION_LEGACY
+  ) {
     throw new BookmarksImportError('Unsupported bookmark file version.');
   }
+
+  const fileVersion =
+    record.version === BOOKMARK_EXPORT_VERSION_LEGACY
+      ? BOOKMARK_EXPORT_VERSION_LEGACY
+      : BOOKMARK_EXPORT_VERSION;
 
   const rawBookmarks = record.bookmarks;
 
@@ -170,7 +225,10 @@ function parseBookmarksImportPayload(text: string): Record<number, BookmarkStatu
     }
   }
 
-  return next;
+  const notes =
+    fileVersion === BOOKMARK_EXPORT_VERSION ? parseNotesImport(record.notes) : {};
+
+  return { bookmarks: next, fileVersion, notes };
 }
 
 export function validateBookmarksImportFile(text: string): void {
@@ -178,8 +236,14 @@ export function validateBookmarksImportFile(text: string): void {
 }
 
 export async function importBookmarksFromJson(text: string): Promise<void> {
-  cache = parseBookmarksImportPayload(text);
+  const { bookmarks, fileVersion, notes } = parseBookmarksImportPayload(text);
+  cache = bookmarks;
   await persistBookmarks();
+
+  if (fileVersion === BOOKMARK_EXPORT_VERSION) {
+    await replaceAllGigNotesFromImport(notes);
+  }
+
   notifyBookmarksChanged();
 }
 

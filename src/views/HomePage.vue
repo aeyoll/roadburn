@@ -85,11 +85,15 @@
                   class="timetable-gig"
                   :class="'timetable-gig--bookmark-' + getGigBookmarkColor(gig.id)"
                   :style="gigStyle(gig)"
-                  :aria-label="gig.title + ' at ' + stage.title + ', ' + gig.displayDate"
+                  :aria-label="gigAriaLabel(gig, stage.title)"
                   @click="openGigDetail(gig)"
                 >
                   <span class="timetable-gig-title">{{ gig.title }}</span>
                   <span class="timetable-gig-time">{{ formatTime(gig.startTimestamp) }} - {{ formatTime(gig.endTimestamp) }}</span>
+                  <span
+                    v-if="gigNotePreview(gig.id)"
+                    class="timetable-gig-note"
+                  >{{ gigNotePreview(gig.id) }}</span>
                 </button>
               </div>
             </div>
@@ -116,6 +120,7 @@ import {
 import type { Day, Stage, Gig, Artist, BookmarkStatus } from '@/types/festival';
 import { fetchFestivalDashboard } from '@/services/api';
 import { initBookmarks, getBookmark, getBookmarkColor, subscribeBookmarksChanged } from '@/services/bookmarks';
+import { initGigNotes, getGigNote, subscribeGigNotesChanged } from '@/services/gigNotes';
 import { syncGigReminders } from '@/services/gigNotifications';
 import GigDetailModal from '@/components/GigDetailModal.vue';
 
@@ -133,6 +138,7 @@ const artists = ref<Artist[]>([]);
 const selectedDayId = ref<number | undefined>();
 
 const bookmarkVersion = ref(0);
+const notesVersion = ref(0);
 
 const selectedDayLabel = computed(() => {
   const day = days.value.find((d) => d.id === selectedDayId.value);
@@ -236,6 +242,31 @@ function getGigBookmarkColor(gigId: number): string {
   return getBookmarkColor(getBookmark(gigId));
 }
 
+function gigNotePreview(gigId: number): string {
+  void notesVersion.value;
+  const text = getGigNote(gigId);
+
+  if (!text) {
+    return '';
+  }
+
+  const max = 48;
+
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
+function gigAriaLabel(gig: Gig, stageTitle: string): string {
+  void notesVersion.value;
+  const base = `${gig.title} at ${stageTitle}, ${gig.displayDate}`;
+  const note = getGigNote(gig.id);
+
+  if (!note) {
+    return base;
+  }
+
+  return `${base}. Note: ${note}`;
+}
+
 function formatTime(timestamp: number): string {
   const date = new Date(timestamp * 1000);
 
@@ -270,7 +301,11 @@ async function loadData() {
   error.value = null;
 
   try {
-    const [data] = await Promise.all([fetchFestivalDashboard(), initBookmarks()]);
+    const [data] = await Promise.all([
+      fetchFestivalDashboard(),
+      initBookmarks(),
+      initGigNotes(),
+    ]);
     days.value = data.days.sort((a, b) => a.sortOrder - b.sortOrder);
     stages.value = data.stages.sort((a, b) => a.sortOrder - b.sortOrder);
     gigs.value = data.gigs;
@@ -297,6 +332,12 @@ onUnmounted(
   subscribeBookmarksChanged(() => {
     bookmarkVersion.value++;
     void syncGigReminders(gigs.value);
+  }),
+);
+
+onUnmounted(
+  subscribeGigNotesChanged(() => {
+    notesVersion.value++;
   }),
 );
 </script>
@@ -525,6 +566,17 @@ onUnmounted(
   font-size: 10px;
   line-height: 1.2;
   opacity: 0.7;
+}
+
+.timetable-gig-note {
+  color: var(--ion-color-medium, #a0a0b8);
+  font-size: 9px;
+  font-style: italic;
+  line-height: 1.2;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sr-only {

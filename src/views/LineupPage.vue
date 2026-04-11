@@ -86,6 +86,7 @@ import { personOutline, bookmark } from 'ionicons/icons';
 import type { Artist, Gig, BookmarkStatus } from '@/types/festival';
 import { fetchFestivalDashboard } from '@/services/api';
 import { initBookmarks, getBookmark, getBookmarkColor, subscribeBookmarksChanged } from '@/services/bookmarks';
+import { initGigNotes } from '@/services/gigNotes';
 import GigDetailModal from '@/components/GigDetailModal.vue';
 
 const loading = ref(true);
@@ -152,7 +153,7 @@ async function loadData() {
   error.value = null;
 
   try {
-    const [data] = await Promise.all([fetchFestivalDashboard(), initBookmarks()]);
+    const [data] = await Promise.all([fetchFestivalDashboard(), initBookmarks(), initGigNotes()]);
     artists.value = data.artists.sort((a, b) => a.title.localeCompare(b.title));
     gigs.value = data.gigs;
   } catch (e) {

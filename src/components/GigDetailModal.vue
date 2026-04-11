@@ -3,7 +3,7 @@
     <ion-toolbar>
       <ion-title>{{ gig.title }}</ion-title>
       <ion-buttons slot="end">
-        <ion-button @click="dismiss" aria-label="Close">
+        <ion-button @click="void dismissWithSave()" aria-label="Close">
           <ion-icon :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
@@ -54,6 +54,25 @@
       </div>
     </div>
 
+    <div class="gig-detail-note-section">
+      <div class="gig-detail-note-card">
+        <label class="gig-detail-note-label" for="gig-detail-note-input">Your note</label>
+        <textarea
+          id="gig-detail-note-input"
+          v-model="noteDraft"
+          class="gig-detail-note-field"
+          :maxlength="GIG_NOTE_MAX_LENGTH"
+          rows="3"
+          aria-describedby="gig-detail-note-hint"
+          placeholder="Optional reminder (visible on the timetable)"
+          @blur="persistNote"
+        />
+      </div>
+      <p id="gig-detail-note-hint" class="gig-detail-note-hint">
+        Up to {{ GIG_NOTE_MAX_LENGTH }} characters.
+      </p>
+    </div>
+
     <div
       v-if="artist?.text"
       class="gig-detail-bio"
@@ -77,7 +96,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onBeforeUnmount } from 'vue';
 import {
   IonHeader,
   IonToolbar,
@@ -97,6 +116,7 @@ import {
 } from 'ionicons/icons';
 import type { Gig, Artist, BookmarkStatus } from '@/types/festival';
 import { getBookmark, setBookmark, getBookmarkLabel } from '@/services/bookmarks';
+import { GIG_NOTE_MAX_LENGTH, getGigNote, setGigNote } from '@/services/gigNotes';
 
 const props = defineProps<{
   gig: Gig;
@@ -105,6 +125,8 @@ const props = defineProps<{
 }>();
 
 const currentBookmark = ref<BookmarkStatus>(getBookmark(props.gig.id));
+
+const noteDraft = ref(getGigNote(props.gig.id));
 
 const currentBookmarkLabel = computed(() => getBookmarkLabel(currentBookmark.value));
 
@@ -127,8 +149,17 @@ async function onBookmark(status: BookmarkStatus) {
   await props.onBookmarksChanged?.();
 }
 
-function dismiss() {
-  modalController.dismiss(currentBookmark.value);
+async function persistNote() {
+  await setGigNote(props.gig.id, noteDraft.value);
+}
+
+onBeforeUnmount(() => {
+  void persistNote();
+});
+
+async function dismissWithSave() {
+  await persistNote();
+  await modalController.dismiss(currentBookmark.value);
 }
 </script>
 
@@ -218,6 +249,59 @@ ion-img {
   --border-radius: 20px;
   font-size: 12px;
   font-weight: 600;
+}
+
+.gig-detail-note-section {
+  padding: 0 16px 8px;
+}
+
+.gig-detail-note-card {
+  background: var(--ion-card-background, #1e1e34);
+  border-radius: 12px;
+  margin-bottom: 6px;
+  padding: 12px 12px 10px;
+}
+
+.gig-detail-note-label {
+  color: var(--ion-color-medium);
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.gig-detail-note-field {
+  background: transparent;
+  border: none;
+  box-sizing: border-box;
+  color: var(--ion-text-color, #f0f0f5);
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.45;
+  margin: 0;
+  min-height: 4.5em;
+  outline: none;
+  padding: .5em;
+  resize: vertical;
+  width: 100%;
+}
+
+.gig-detail-note-field::placeholder {
+  color: var(--ion-color-medium);
+  opacity: 1;
+}
+
+.gig-detail-note-field:focus-visible {
+  outline: 1px solid rgba(255, 255, 255, 0.5);
+  outline-offset: 2px;
+}
+
+.gig-detail-note-hint {
+  color: var(--ion-color-medium);
+  font-size: 12px;
+  line-height: 1.4;
+  margin: 0 4px 0 8px;
 }
 
 .gig-detail-bio {
