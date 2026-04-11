@@ -64,7 +64,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import {
   IonPage,
   IonHeader,
@@ -85,7 +85,7 @@ import {
 import { personOutline, bookmark } from 'ionicons/icons';
 import type { Artist, Gig, BookmarkStatus } from '@/types/festival';
 import { fetchFestivalDashboard } from '@/services/api';
-import { initBookmarks, getBookmark, getBookmarkColor } from '@/services/bookmarks';
+import { initBookmarks, getBookmark, getBookmarkColor, subscribeBookmarksChanged } from '@/services/bookmarks';
 import GigDetailModal from '@/components/GigDetailModal.vue';
 
 const loading = ref(true);
@@ -144,11 +144,7 @@ async function openArtistDetail(artist: Artist) {
 
   await modal.present();
 
-  const { data } = await modal.onDidDismiss<BookmarkStatus>();
-
-  if (data !== undefined) {
-    bookmarkVersion.value++;
-  }
+  await modal.onDidDismiss<BookmarkStatus>();
 }
 
 async function loadData() {
@@ -170,6 +166,12 @@ async function loadData() {
 onMounted(() => {
   loadData();
 });
+
+onUnmounted(
+  subscribeBookmarksChanged(() => {
+    bookmarkVersion.value++;
+  }),
+);
 </script>
 
 <style scoped>

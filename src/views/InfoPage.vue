@@ -45,7 +45,33 @@
             <p>{{ festivalData?.displayDate ?? 'April 2026' }}</p>
           </ion-label>
         </ion-item>
+
+        <ion-item button @click="exportBookmarks">
+          <ion-icon :icon="downloadOutline" slot="start" aria-hidden="true" />
+          <ion-label>
+            <h2>Export bookmarks</h2>
+            <p>Save a JSON file to Files or Downloads</p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item button @click="triggerImportPicker">
+          <ion-icon :icon="cloudUploadOutline" slot="start" aria-hidden="true" />
+          <ion-label>
+            <h2>Import bookmarks</h2>
+            <p>Restore from a previously exported JSON file</p>
+          </ion-label>
+        </ion-item>
       </ion-list>
+
+      <input
+        ref="importFileInputRef"
+        type="file"
+        accept="application/json,.json"
+        class="info-import-input"
+        aria-hidden="true"
+        tabindex="-1"
+        @change="onImportFileSelected"
+      />
 
       <div class="info-stats">
         <div class="info-stat">
@@ -61,6 +87,15 @@
           <span class="info-stat-label">Days</span>
         </div>
       </div>
+
+      <ion-toast
+        :is-open="toastOpen"
+        :message="toastMessage"
+        :duration="2500"
+        :color="toastColor"
+        position="bottom"
+        @didDismiss="toastOpen = false"
+      />
     </ion-content>
   </ion-page>
 </template>
@@ -77,20 +112,46 @@ import {
   IonItem,
   IonLabel,
   IonIcon,
+  IonToast,
+  alertController,
 } from '@ionic/vue';
+import { Capacitor } from '@capacitor/core';
+import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
 import {
   ticketOutline,
   locationOutline,
   calendarOutline,
   openOutline,
+  downloadOutline,
+  cloudUploadOutline,
 } from 'ionicons/icons';
 import type { FestivalDashboard } from '@/types/festival';
 import { fetchFestivalDashboard } from '@/services/api';
+import {
+  BookmarksImportError,
+  buildBookmarksExportJson,
+  exportBookmarksFilenameDatePrefix,
+  importBookmarksFromJson,
+  initBookmarks,
+  validateBookmarksImportFile,
+} from '@/services/bookmarks';
 
 const festivalData = ref<FestivalDashboard | null>(null);
 const artistCount = ref(0);
 const stageCount = ref(0);
 const dayCount = ref(0);
+
+const importFileInputRef = ref<HTMLInputElement | null>(null);
+
+const toastOpen = ref(false);
+const toastMessage = ref('');
+const toastColor = ref<'success' | 'danger' | 'medium'>('medium');
+
+function showToast(message: string, color: 'success' | 'danger' | 'medium') {
+  toastMessage.value = message;
+  toastColor.value = color;
+  toastOpen.value = true;
+}
 
 async function loadData() {
   try {
@@ -104,7 +165,101 @@ async function loadData() {
   }
 }
 
+async function exportBookmarks() {
+  const json = buildBookmarksExportJson();
+  const baseName = `roadburn-bookmarks-${exportBookmarksFilenameDatePrefix()}.json`;
+
+  try {
+    if (Capacitor.isNativePlatform()) {
+      await Filesystem.writeFile({
+        path: baseName,
+        data: json,
+        directory: Directory.Documents,
+        encoding: Encoding.UTF8,
+      });
+      showToast(`Saved ${baseName} to this app’s Documents folder (visible in the Files app).`, 'success');
+    } else {
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = baseName;
+      anchor.rel = 'noopener';
+      anchor.click();
+      URL.revokeObjectURL(url);
+      showToast('Bookmark file downloaded.', 'success');
+    }
+  } catch (e) {
+    console.error(e);
+    showToast('Could not export bookmarks. Please try again.', 'danger');
+  }
+}
+
+function triggerImportPicker() {
+  importFileInputRef.value?.click();
+}
+
+async function onImportFileSelected(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+
+  input.value = '';
+
+  if (!file) {
+    return;
+  }
+
+  let text: string;
+
+  try {
+    text = await file.text();
+  } catch (e) {
+    console.error(e);
+    showToast('Could not read the selected file.', 'danger');
+
+    return;
+  }
+
+  try {
+    validateBookmarksImportFile(text);
+  } catch (e) {
+    const message = e instanceof BookmarksImportError ? e.message : 'Invalid bookmark file.';
+    showToast(message, 'danger');
+
+    return;
+  }
+
+  const alert = await alertController.create({
+    header: 'Replace all bookmarks?',
+    message:
+      'This will remove every bookmark on this device and replace them with the ones from this file.',
+    buttons: [
+      {
+        text: 'Cancel',
+        role: 'cancel',
+      },
+      {
+        text: 'Replace',
+        role: 'destructive',
+        handler: async () => {
+          try {
+            await importBookmarksFromJson(text);
+            showToast('Bookmarks imported.', 'success');
+          } catch (err) {
+            const message =
+              err instanceof BookmarksImportError ? err.message : 'Import failed.';
+            showToast(message, 'danger');
+          }
+        },
+      },
+    ],
+  });
+
+  await alert.present();
+}
+
 onMounted(() => {
+  void initBookmarks();
   loadData();
 });
 </script>
@@ -164,6 +319,15 @@ ion-item p {
 ion-item ion-icon[slot="start"] {
   color: var(--ion-color-primary);
   margin-right: 12px;
+}
+
+.info-import-input {
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  position: absolute;
+  width: 1px;
+  z-index: -1;
 }
 
 .info-stats {

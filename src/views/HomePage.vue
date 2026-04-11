@@ -101,7 +101,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import {
   IonPage,
   IonHeader,
@@ -115,7 +115,7 @@ import {
 } from '@ionic/vue';
 import type { Day, Stage, Gig, Artist, BookmarkStatus } from '@/types/festival';
 import { fetchFestivalDashboard } from '@/services/api';
-import { initBookmarks, getBookmark, getBookmarkColor } from '@/services/bookmarks';
+import { initBookmarks, getBookmark, getBookmarkColor, subscribeBookmarksChanged } from '@/services/bookmarks';
 import { syncGigReminders } from '@/services/gigNotifications';
 import GigDetailModal from '@/components/GigDetailModal.vue';
 
@@ -257,17 +257,12 @@ async function openGigDetail(gig: Gig) {
     componentProps: {
       gig,
       artist,
-      onBookmarksChanged: () => syncGigReminders(gigs.value),
     },
   });
 
   await modal.present();
 
-  const { data } = await modal.onDidDismiss<BookmarkStatus>();
-
-  if (data !== undefined) {
-    bookmarkVersion.value++;
-  }
+  await modal.onDidDismiss<BookmarkStatus>();
 }
 
 async function loadData() {
@@ -297,6 +292,13 @@ async function loadData() {
 onMounted(() => {
   loadData();
 });
+
+onUnmounted(
+  subscribeBookmarksChanged(() => {
+    bookmarkVersion.value++;
+    void syncGigReminders(gigs.value);
+  }),
+);
 </script>
 
 <style scoped>
