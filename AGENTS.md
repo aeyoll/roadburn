@@ -114,4 +114,5 @@ After web changes that should ship in the store, run `npm run build` then sync w
 
 ## Related docs
 
-There is no root `README.md` in this repo at time of writing; this file is the high-level orientation for humans and coding agents.
+- **[README.md](./README.md)** — Human-oriented overview: prerequisites, quick start, npm scripts, native workflow, pointer to the API module.
+- **This file (`AGENTS.md`)** — Deeper orientation for contributors and coding agents (layout, API contract, behavior, and edit constraints).
