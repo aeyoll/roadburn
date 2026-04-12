@@ -11,12 +11,31 @@
                         :key="day.id"
                         role="tab"
                         class="day-pill"
-                        :class="{ 'day-pill-active': day.id === selectedDayId }"
+                        :class="{ 'active': day.id === selectedDayId }"
                         :aria-selected="day.id === selectedDayId"
                         @click="selectDay(day.id)"
                     >
                         <span class="day-pill-name">{{ day.titleShort }}</span>
                         <span class="day-pill-date">{{ day.subtitleShort }}</span>
+                    </button>
+                </div>
+            </ion-toolbar>
+            <ion-toolbar class="fav-toolbar">
+                <div class="fav-pills" aria-label="Filter favorites" role="tablist">
+                    <button
+                        v-for="status in favoriteStatuses"
+                        :key="status"
+                        role="tab"
+                        class="fav-pill"
+                        :class="{ 'selected': selectedFavoriteStatuses.includes(status) }"
+                        :aria-selected="selectedFavoriteStatuses.includes(status)"
+                        @click="toggleFavoriteStatus(status)"
+                    >
+                        <span
+                            class="fav-pill-bullet"
+                            :class="status"
+                        ></span>
+                        <span class="fav-pill-name">{{ status }}</span>
                     </button>
                 </div>
             </ion-toolbar>
@@ -237,14 +256,14 @@ function getGigConcurrentCount(gig: Gig): number {
 }
 
 function getExpandedGigWidth(gig: Gig): number {
-    // Width based on concurrent count for this specific gig
     const concurrentCount = getGigConcurrentCount(gig);
+
     return 1 / concurrentCount;
 }
 
 function getGigDefaultWidth(): number {
-    // Default width based on 2x peak concurrent count for more size flexibility
     const peakConcurrent = getPeakConcurrentGigCount();
+
     return 1 / (2 * peakConcurrent);
 }
 
@@ -430,7 +449,7 @@ function formatTime(timestamp: number): string {
 }
 
 function selectDay(dayId: number) {
-    cachedLayout = null; // Clear cache when day changes
+    cachedLayout = null;
     selectedDayId.value = dayId;
 }
 
@@ -485,7 +504,7 @@ onMounted(() => {
 
 onUnmounted(
     subscribeBookmarksChanged(() => {
-        cachedLayout = null; // Clear cache when bookmarks change
+        cachedLayout = null;
         bookmarkVersion.value++;
         void syncGigReminders(gigs.value);
     }),
@@ -493,7 +512,7 @@ onUnmounted(
 
 onUnmounted(
     subscribeGigNotesChanged(() => {
-        cachedLayout = null; // Clear cache when notes change
+        cachedLayout = null;
         notesVersion.value++;
     }),
 );
@@ -505,54 +524,142 @@ onUnmounted(
         --border-width: 0;
         --padding-start: 0;
         --padding-end: 0;
+
+        .day-pills {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            padding: 4px 12px 10px;
+            scrollbar-width: none;
+
+            &::-webkit-scrollbar {
+                display: none;
+            }
+        }
+
+
+        .day-pill {
+            align-items: center;
+            background: var(--ion-color-light, #2a2a3e);
+            border: 2px solid transparent;
+            border-radius: 10px;
+            color: var(--ion-text-color, #f0f0f5);
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            gap: 1px;
+            padding: 8px 16px;
+            transition: background 0.2s, border-color 0.2s;
+
+            &:focus-visible {
+                outline: 2px solid var(--ion-color-primary);
+                outline-offset: 2px;
+            }
+
+            &.active {
+                background: var(--ion-color-primary);
+                border-color: var(--ion-color-primary);
+            }
+
+            .day-pill-name {
+                font-size: 13px;
+                font-weight: 700;
+                letter-spacing: 0.5px;
+            }
+
+            .day-pill-date {
+                font-size: 10px;
+                opacity: 0.8;
+            }
+        }
     }
 
-    .day-pills {
-        display: flex;
-        gap: 6px;
-        overflow-x: auto;
-        padding: 4px 12px 10px;
-        scrollbar-width: none;
-    }
+    .fav-toolbar {
+        --background: var(--ion-background-color, #121220);
+        --border-width: 0;
+        --padding-start: 0;
+        --padding-end: 0;
 
-    .day-pills::-webkit-scrollbar {
-        display: none;
-    }
+        .fav-pills {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            padding: 4px 12px 10px;
+            scrollbar-width: none;
 
-    .day-pill {
-        align-items: center;
-        background: var(--ion-color-light, #2a2a3e);
-        border: 2px solid transparent;
-        border-radius: 10px;
-        color: var(--ion-text-color, #f0f0f5);
-        cursor: pointer;
-        display: flex;
-        flex-direction: column;
-        flex-shrink: 0;
-        gap: 1px;
-        padding: 8px 16px;
-        transition: background 0.2s, border-color 0.2s;
-    }
+            &::-webkit-scrollbar {
+                display: none;
+            }
 
-    .day-pill:focus-visible {
-        outline: 2px solid var(--ion-color-primary);
-        outline-offset: 2px;
-    }
+            .fav-pill {
+                display: flex;
+                flex-shrink: 0;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                padding: 8px;
+                border: 1px solid transparent;
+                border-radius: 10px;
+                color: var(--ion-text-color, #f0f0f5);
+                background: var(--ion-color-light, #2a2a3e);
+                transition: background 0.2s, border-color 0.2s;
+                cursor: pointer;
 
-    .day-pill-active {
-        background: var(--ion-color-primary);
-        border-color: var(--ion-color-primary);
-    }
+                &:focus-visible {
+                    outline: 2px solid var(--ion-color-primary);
+                    outline-offset: 2px;
+                }
 
-    .day-pill-name {
-        font-size: 13px;
-        font-weight: 700;
-        letter-spacing: 0.5px;
-    }
+                &.selected {
 
-    .day-pill-date {
-        font-size: 10px;
-        opacity: 0.8;
+                    &:has(> .fav-pill-bullet.mandatory) {
+                        border-color: var(--ion-color-danger, #ef5350);
+                    }
+                    &:has(> .fav-pill-bullet.yes) {
+                        border-color: var(--ion-color-success, #4caf50);
+                    }
+                    &:has(> .fav-pill-bullet.maybe) {
+                        border-color: var(--ion-color-warning, #ffb300);
+                    }
+                    &:has(> .fav-pill-bullet.none) {
+                        border-color: var(--ion-color-medium, #898989);
+                    }
+
+                    .fav-pill-bullet {
+                        opacity: 1;
+
+                        &.mandatory {
+                            background-color: var(--ion-color-danger, #ef5350);
+                        }
+                        &.yes {
+                            background-color: var(--ion-color-success, #4caf50);
+                        }
+                        &.maybe {
+                            background-color: var(--ion-color-warning, #ffb300);
+                        }
+                        &.none {
+                            background-color: var(--ion-color-medium, #898989);
+                        }
+                    }
+                }
+
+                .fav-pill-bullet {
+                    width: 10px;
+                    height: 10px;
+                    border-radius: 50%;
+                    background-color: #4f4f67;
+                    opacity: 0.5;
+                }
+
+                .fav-pill-name {
+                    text-transform: capitalize;
+                    font-size: 11px;
+                    font-weight: 700;
+                    letter-spacing: 0.5px;
+                }
+            }
+        }
     }
 
     .timetable-spinner {
