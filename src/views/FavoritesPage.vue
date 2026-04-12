@@ -120,6 +120,8 @@ const stages = ref<Stage[]>([]);
 const gigs = ref<Gig[]>([]);
 const artists = ref<Artist[]>([]);
 const selectedDayId = ref<number | undefined>();
+const favoriteStatuses = ref<BookmarkStatus[]>(['mandatory', 'yes', 'maybe', 'none']);
+const selectedFavoriteStatuses = ref<BookmarkStatus[]>(['mandatory', 'yes', 'maybe']);
 
 const bookmarkVersion = ref(0);
 const notesVersion = ref(0);
@@ -206,63 +208,176 @@ function timestampToPixels(timestamp: number): number {
     return minutes * PIXELS_PER_MINUTE;
 }
 
+function getPeakConcurrentGigCount(): number {
+    if (favsGigsForDay.value.length === 0) {
+        return 1;
+    }
+
+    let maxConcurrent = 1;
+    favsGigsForDay.value.forEach((gig) => {
+        const concurrent = getGigConcurrentCount(gig) - 1; // Exclude the gig itself
+
+        if (concurrent > 0) {
+            maxConcurrent = Math.max(maxConcurrent, concurrent);
+        }
+    });
+
+    return maxConcurrent;
+}
+
+function getGigConcurrentCount(gig: Gig): number {
+    const concurrent = favsGigsForDay.value.filter(
+        (other) =>
+            other.id !== gig.id &&
+            other.startTimestamp < gig.endTimestamp &&
+            other.endTimestamp > gig.startTimestamp
+    ).length;
+
+    return concurrent + 1;
+}
+
+function getExpandedGigWidth(gig: Gig): number {
+    // Width based on concurrent count for this specific gig
+    const concurrentCount = getGigConcurrentCount(gig);
+    return 1 / concurrentCount;
+}
+
+function getGigDefaultWidth(): number {
+    // Default width based on 2x peak concurrent count for more size flexibility
+    const peakConcurrent = getPeakConcurrentGigCount();
+    return 1 / (2 * peakConcurrent);
+}
+
+interface GitPosition {
+    offsetStart: number;
+    offsetEnd: number;
+    startTimestamp: number;
+    endTimestamp: number;
+    width: number;
+}
+
+let cachedLayout: Map<number, GitPosition> | null = null;
+let cachedFavsGigsKey: string = '';
+
+function buildLayout(): Map<number, GitPosition> {
+    const gigPositions = new Map<number, GitPosition>();
+    const defaultWidth = getGigDefaultWidth();
+
+    const sortedGigs = favsGigsForDay.value.slice().sort((a, b) => {
+        const priorityDifference = favoriteStatuses.value.indexOf(getBookmark(a.id)) - favoriteStatuses.value.indexOf(getBookmark(b.id));
+
+        if (priorityDifference !== 0) {
+            return priorityDifference;
+        }
+        if (a.startTimestamp !== b.startTimestamp) {
+            return a.startTimestamp - b.startTimestamp;
+        }
+        return a.endTimestamp - b.endTimestamp;
+    });
+
+    for (const gig of sortedGigs) {
+        const expandedWidth = getExpandedGigWidth(gig);
+        const gigWidth = Math.max(defaultWidth, expandedWidth);
+        const gaps: Array<{ start: number; end: number; size: number }> = [];
+        const overlappingSegments = [...gigPositions.values()].filter(seg =>
+            seg.startTimestamp < gig.endTimestamp && seg.endTimestamp > gig.startTimestamp
+        );
+
+        if (overlappingSegments.length === 0) {
+            gaps.push({ start: 0, end: 1, size: 1 });
+        } else {
+            const sortedSegments = overlappingSegments.sort((a, b) => a.offsetStart - b.offsetStart);
+
+            if (sortedSegments[0].offsetStart > 0) {
+                const gapEnd = sortedSegments[0].offsetStart;
+
+                gaps.push({ start: 0, end: gapEnd, size: gapEnd });
+            }
+
+            for (let i = 0; i < sortedSegments.length - 1; i++) {
+                const gapStart = sortedSegments[i].offsetEnd;
+                const gapEnd = sortedSegments[i + 1].offsetStart;
+
+                if (gapEnd > gapStart) {
+                    const gapSize = gapEnd - gapStart;
+
+                    gaps.push({ start: gapStart, end: gapEnd, size: gapSize });
+                }
+            }
+
+            const lastSegment = sortedSegments[sortedSegments.length - 1];
+            if (lastSegment.offsetEnd < 1) {
+                const gapSize = 1 - lastSegment.offsetEnd;
+
+                gaps.push({ start: lastSegment.offsetEnd, end: 1, size: gapSize });
+            }
+        }
+
+        const fittingGaps = gaps.filter(gap => gap.size >= gigWidth);
+        let bestGap: typeof gaps[0] | undefined;
+
+        if (fittingGaps.length > 0) {
+            bestGap = fittingGaps.reduce((largest, gap) =>
+                gap.size > largest.size ? gap : largest
+            );
+        } else {
+            bestGap = gaps.reduce((largest, gap) =>
+                gap.size > (largest?.size ?? 0) ? gap : largest
+            );
+        }
+
+        const offsetStart = bestGap?.start ?? 0;
+        const offsetEnd = offsetStart + gigWidth;
+
+        gigPositions.set(gig.id, {
+            offsetStart,
+            offsetEnd,
+            startTimestamp: gig.startTimestamp,
+            endTimestamp: gig.endTimestamp,
+            width: gigWidth
+        });
+    }
+    return gigPositions;
+}
+
+function getLayout(): Map<number, GitPosition> {
+    const key = favsGigsForDay.value.map(g => g.id).join('|');
+
+    if (!cachedLayout || cachedFavsGigsKey !== key) {
+        cachedLayout = buildLayout();
+        cachedFavsGigsKey = key;
+    }
+
+    return cachedLayout;
+}
+
 function gigFavStyle(gig: Gig): Record<string, string> {
-    const { total, index } = getConcurrentColumns(gig);
+    const layout = getLayout();
     const top = timestampToPixels(gig.startTimestamp);
     const height = timestampToPixels(gig.endTimestamp) - top;
+    const posInfo = layout.get(gig.id) ?? {
+        offsetStart: 0,
+        offsetEnd: getGigDefaultWidth(),
+        width: getGigDefaultWidth()
+    };
+
+    const leftPosition = 60 + posInfo.offsetStart * totalColumnWidth;
+    const widthPixels = posInfo.width * totalColumnWidth;
 
     return {
-        left: 60 + (index * (totalColumnWidth / total)) + 'px',
+        left: leftPosition + 'px',
         top: top + 'px',
-        width: (totalColumnWidth / total) + 'px',
+        width: widthPixels + 'px',
         height: height + 'px',
     };
 }
 
-function getConcurrentColumns(gig: Gig): { total: number; index: number } {
-    const priorityOrder = ['mandatory', 'yes', 'maybe'];
-    const overlappingGigs = favsGigsForDay.value
-        .filter((favGigForDay) =>
-            favGigForDay.startTimestamp < gig.endTimestamp
-            && favGigForDay.endTimestamp > gig.startTimestamp
-        )
-        .slice()
-        .sort((a, b) => {
-            const priorityDifference = priorityOrder.indexOf(getBookmark(a.id)) - priorityOrder.indexOf(getBookmark(b.id));
-            if (priorityDifference !== 0) {
-                return priorityDifference;
-            }
-            if (a.startTimestamp !== b.startTimestamp) {
-                return a.startTimestamp - b.startTimestamp;
-            }
-            return a.endTimestamp - b.endTimestamp;
-        });
-
-    const columns: Array<{ end: number }> = [];
-    const assignment = new Map<number, number>();
-
-    for (const candidate of overlappingGigs) {
-        let assigned = false;
-
-        for (let columnIndex = 0; columnIndex < columns.length; columnIndex++) {
-            if (columns[columnIndex].end <= candidate.startTimestamp) {
-                columns[columnIndex].end = candidate.endTimestamp;
-                assignment.set(candidate.id, columnIndex);
-                assigned = true;
-                break;
-            }
-        }
-
-        if (!assigned) {
-            assignment.set(candidate.id, columns.length);
-            columns.push({ end: candidate.endTimestamp });
-        }
+function toggleFavoriteStatus(status: BookmarkStatus) {
+    if (selectedFavoriteStatuses.value.includes(status)) {
+        selectedFavoriteStatuses.value = selectedFavoriteStatuses.value.filter(s => s !== status);
+    } else {
+        selectedFavoriteStatuses.value.push(status);
     }
-
-    return {
-        total: Math.max(1, columns.length),
-        index: assignment.get(gig.id) ?? 0,
-    };
 }
 
 function getGigBookmarkColor(gigId: number): string {
@@ -274,9 +389,8 @@ function getGigBookmarkColor(gigId: number): string {
 function isGigFavorite(gigId: number): boolean {
     void bookmarkVersion.value;
     const bookmarkStatus = getBookmark(gigId);
-    const favoriteStatuses: BookmarkStatus[] = ['maybe', 'yes', 'mandatory'];
 
-    return favoriteStatuses.includes(bookmarkStatus);
+    return selectedFavoriteStatuses.value.includes(bookmarkStatus);
 }
 
 function gigNotePreview(gigId: number): string {
@@ -316,6 +430,7 @@ function formatTime(timestamp: number): string {
 }
 
 function selectDay(dayId: number) {
+    cachedLayout = null; // Clear cache when day changes
     selectedDayId.value = dayId;
 }
 
@@ -370,6 +485,7 @@ onMounted(() => {
 
 onUnmounted(
     subscribeBookmarksChanged(() => {
+        cachedLayout = null; // Clear cache when bookmarks change
         bookmarkVersion.value++;
         void syncGigReminders(gigs.value);
     }),
@@ -377,6 +493,7 @@ onUnmounted(
 
 onUnmounted(
     subscribeGigNotesChanged(() => {
+        cachedLayout = null; // Clear cache when notes change
         notesVersion.value++;
     }),
 );
