@@ -35,9 +35,21 @@
       <div
         v-if="!loading && !error && timelineStart !== null"
         class="timetable-scroll"
+        @touchstart="pinchStart"
+        @touchmove="pinchMove"
+        @wheel.ctrl="zoomWheel"
       >
-        <div class="timetable-grid" :aria-label="'Timetable for ' + selectedDayLabel" role="grid">
-          <div class="timetable-header" role="row">
+        <div
+            class="timetable-grid"
+            :aria-label="'Timetable for ' + selectedDayLabel" role="grid"
+            :style="{
+              transform: `scaleX(${scale})`
+            }"
+        >
+          <div
+            class="timetable-header"
+            role="row"
+          >
             <div class="timetable-time-header" role="columnheader">
               <span class="sr-only">Time</span>
             </div>
@@ -46,30 +58,48 @@
               :key="stage.id"
               class="timetable-stage-header"
               role="columnheader"
+              :style="{
+                transform: `scaleX(${1 / scale})`
+              }"
             >
               {{ stage.title }}
             </div>
           </div>
 
-          <div class="timetable-body" :style="{ height: timelineHeight + 'px' }">
+          <div
+            class="timetable-body"
+            :style="{
+              height: timelineHeight + 'px',
+              transform: `scaleY(${scale}) scaleX(${1 /scale})`
+            }"
+          >
             <div class="timetable-time-column">
               <div
                 v-for="slot in timeSlots"
                 :key="slot.timestamp"
                 class="timetable-time-marker"
-                :style="{ top: timestampToPixels(slot.timestamp) + 'px' }"
+                :style="{
+                  top: timestampToPixels(slot.timestamp) + 'px',
+                  transform: `scaleY(${1 / scale})`
+                }"
               >
                 {{ slot.label }}
               </div>
             </div>
 
-            <div class="timetable-lanes" :style="{ height: timelineHeight + 'px' }">
+            <div class="timetable-lanes" :style="{
+                height: timelineHeight + 'px',
+                  transform: `scaleX(${scale})`
+                }">
               <div class="timetable-gridlines">
                 <div
                   v-for="slot in timeSlots"
                   :key="slot.timestamp"
                   class="timetable-gridline"
-                  :style="{ top: timestampToPixels(slot.timestamp) + 'px' }"
+                  :style="{
+                    top: timestampToPixels(slot.timestamp) + 'px',
+                    transform: `scaleY(${1 / scale})`
+                  }"
                 />
               </div>
 
@@ -84,7 +114,10 @@
                   :key="gig.id"
                   class="timetable-gig"
                   :class="'timetable-gig--bookmark-' + getGigBookmarkColor(gig.id)"
-                  :style="gigStyle(gig)"
+                  :style="{
+                    ...gigStyle(gig),
+                    // transform: `scaleX(${scale})`
+                  }"
                   :aria-label="gigAriaLabel(gig, stage.title)"
                   @click="openGigDetail(gig)"
                 >
@@ -209,6 +242,47 @@ const timelineHeight = computed(() => {
 
   return minutes * PIXELS_PER_MINUTE;
 });
+
+const scale = ref(1);
+const initialDistance = ref(0);
+
+const pinchStart = (event: TouchEvent) => {
+    if (event.touches.length === 2) {
+        const touch1 = event.touches[0];
+        const touch2 = event.touches[1];
+
+        initialDistance.value = Math.hypot(
+            touch2.clientX - touch1.clientX,
+            touch2.clientY - touch1.clientY
+        );
+    }
+};
+
+const pinchMove = (event: TouchEvent) => {
+    if (event.touches.length === 2) {
+        event.preventDefault();
+        const touch1 = event.touches[0];
+        const touch2 = event.touches[1];
+        const currentDistance = Math.hypot(
+            touch2.clientX - touch1.clientX,
+            touch2.clientY - touch1.clientY
+        );
+
+        scale.value = Math.max(0.5, Math.min(3, currentDistance / initialDistance.value));
+        if (scale.value < 0.5) {
+            scale.value = 0.5;
+        }
+    }
+};
+
+const zoomWheel = ($event: WheelEvent) => {
+    $event.preventDefault();
+
+    scale.value += $event.deltaY * -0.01;
+    if (scale.value < 0.5) {
+        scale.value = 0.5;
+    }
+};
 
 function timestampToPixels(timestamp: number): number {
   if (timelineStart.value === null) {
@@ -418,22 +492,27 @@ onUnmounted(
   display: flex;
   flex-direction: column;
   min-width: max-content;
+  transform-origin: left top;
+
+  * {
+    transform-origin: left top;
+  }
 }
 
 .timetable-header {
-  display: flex;
   position: sticky;
   top: 0;
   z-index: 4;
+  display: flex;
+  background: var(--ion-toolbar-background, #1a1a2e);
 }
 
 .timetable-time-header {
-  background: var(--ion-toolbar-background, #1a1a2e);
-  flex-shrink: 0;
-  min-width: 54px;
   position: sticky;
   left: 0;
   z-index: 5;
+  flex-shrink: 0;
+  min-width: 54px;
 }
 
 .timetable-stage-header {
@@ -521,7 +600,7 @@ onUnmounted(
   position: absolute;
   right: 3px;
   text-align: left;
-  transition: transform 0.15s, box-shadow 0.15s;
+  transition: box-shadow 0.15s;
 }
 
 .timetable-gig:active {
