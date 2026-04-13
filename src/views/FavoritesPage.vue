@@ -20,6 +20,7 @@
                     </button>
                 </div>
             </ion-toolbar>
+
             <ion-toolbar class="fav-toolbar">
                 <div class="fav-pills" aria-label="Filter favorites" role="tablist">
                     <button
@@ -54,42 +55,72 @@
             <div
                 v-if="!loading && !error && timelineStart !== null"
                 class="timetable-scroll"
+                @touchstart="pinchStart"
+                @touchmove="pinchMove"
+                @wheel.ctrl="zoomWheel"
             >
-                <div class="timetable-grid" :aria-label="'Timetable for ' + selectedDayLabel" role="grid">
+                <div
+                    class="timetable-grid"
+                    role="grid"
+                    :aria-label="'Timetable for ' + selectedDayLabel"
+                    :style="{
+                        transform: `scaleY(${scale})`
+                    }"
+                >
                     <div class="timetable-header" role="row">
                         <div class="timetable-time-header" role="columnheader">
                             <span class="sr-only">Time</span>
                         </div>
                     </div>
 
-                    <div class="timetable-body" :style="{ height: timelineHeight + 'px' }">
-                        <div class="timetable-time-column">
+                    <div
+                        class="timetable-body"
+                        :style="{ height: timelineHeight + 'px' }"
+                    >
+                        <div
+                            class="timetable-time-column"
+                        >
                             <div
                                 v-for="slot in timeSlots"
                                 :key="slot.timestamp"
                                 class="timetable-time-marker"
-                                :style="{ top: timestampToPixels(slot.timestamp) + 'px' }"
+                                :style="{
+                                    top: timestampToPixels(slot.timestamp) + 'px',
+                                    transform: `scaleY(${1 / scale})`
+                                }"
                             >
                                 {{ slot.label }}
                             </div>
                         </div>
 
-                        <div class="timetable-lanes" :style="{ height: timelineHeight + 'px' }">
+                        <div
+                            class="timetable-lanes"
+                            :style="{
+                                height: timelineHeight + 'px',
+                            }"
+                        >
                             <div class="timetable-gridlines">
                                 <div
                                     v-for="slot in timeSlots"
                                     :key="slot.timestamp"
                                     class="timetable-gridline"
-                                    :style="{ top: timestampToPixels(slot.timestamp) + 'px' }"
+                                    :style="{
+                                        top: timestampToPixels(slot.timestamp) + 'px',
+                                        transform: `scaleY(${1 / scale})`
+                                    }"
                                 />
                             </div>
                         </div>
+
                         <button
-                            v-for="(renderedFavGig, favGigIndex) in favsRenderedGigsForDay"
+                            v-for="renderedFavGig in favsRenderedGigsForDay"
                             :key="renderedFavGig.gig.id"
                             class="timetable-gig"
                             :class="'timetable-gig--bookmark-' + getGigBookmarkColor(renderedFavGig.gig.id)"
-                            :style="renderedFavGig.style"
+                            :style="{
+                                ...renderedFavGig.style,
+                                transform: `scaleX(${scale})`
+                            }"
                             :aria-label="favGigAriaLabel(renderedFavGig.gig)"
                             @click="openGigDetail(renderedFavGig.gig)"
                         >
@@ -161,7 +192,7 @@ const favsGigsForDay = computed(() => {
 const favsRenderedGigsForDay = computed(() => {
     return favsGigsForDay.value.map((g) => ({
         gig: g,
-        style: gigFavStyle(g),
+        style: gigFavStyle(g, scale.value),
     }));
 });
 
@@ -362,7 +393,7 @@ function getLayout(): Map<number, GigPosition> {
     return cachedLayout;
 }
 
-function gigFavStyle(gig: Gig): Record<string, string> {
+function gigFavStyle(gig: Gig, scale: number): Record<string, string> {
     const layout = getLayout();
     const top = timestampToPixels(gig.startTimestamp);
     const height = timestampToPixels(gig.endTimestamp) - top;
@@ -371,12 +402,11 @@ function gigFavStyle(gig: Gig): Record<string, string> {
         offsetEnd: getGigDefaultWidth(),
         width: getGigDefaultWidth()
     };
-
-    const leftPosition = 60 + posInfo.offsetStart * totalColumnWidth;
+    const leftPosition = posInfo.offsetStart * totalColumnWidth;
     const widthPixels = posInfo.width * totalColumnWidth;
 
     return {
-        left: leftPosition + 'px',
+        left: 60 + (leftPosition * scale) + 'px',
         top: top + 'px',
         width: widthPixels + 'px',
         height: height + 'px',
@@ -444,6 +474,47 @@ function selectDay(dayId: number) {
     cachedLayout = null;
     selectedDayId.value = dayId;
 }
+
+const scale = ref(1);
+const initialDistance = ref(0);
+
+const pinchStart = (event: TouchEvent) => {
+    if (event.touches.length === 2) {
+        const touch1 = event.touches[0];
+        const touch2 = event.touches[1];
+
+        initialDistance.value = Math.hypot(
+            touch2.clientX - touch1.clientX,
+            touch2.clientY - touch1.clientY
+        );
+    }
+};
+
+const pinchMove = (event: TouchEvent) => {
+    if (event.touches.length === 2) {
+        event.preventDefault();
+        const touch1 = event.touches[0];
+        const touch2 = event.touches[1];
+        const currentDistance = Math.hypot(
+            touch2.clientX - touch1.clientX,
+            touch2.clientY - touch1.clientY
+        );
+
+        scale.value = Math.max(0.5, Math.min(3, currentDistance / initialDistance.value));
+        if (scale.value < 0.5) {
+            scale.value = 0.5;
+        }
+    }
+};
+
+const zoomWheel = ($event: WheelEvent) => {
+    $event.preventDefault();
+
+    scale.value += $event.deltaY * -0.01;
+    if (scale.value < 0.5) {
+        scale.value = 0.5;
+    }
+};
 
 async function openGigDetail(gig: Gig) {
     const artist = artists.value.find((a) => a.id === gig.artistId);
@@ -572,12 +643,15 @@ onUnmounted(
         --border-width: 0;
         --padding-start: 0;
         --padding-end: 0;
+        --padding-top: 0;
+        --padding-bottom: 0;
+        --min-height: 35px;
 
         .fav-pills {
             display: flex;
             gap: 6px;
             overflow-x: auto;
-            padding: 4px 12px 10px;
+            padding: 0px 12px 4px;
             scrollbar-width: none;
 
             &::-webkit-scrollbar {
@@ -674,6 +748,7 @@ onUnmounted(
         display: flex;
         flex-direction: column;
         min-width: max-content;
+        transform-origin: left top;
     }
 
     .timetable-header {
@@ -723,16 +798,17 @@ onUnmounted(
     }
 
     .timetable-time-marker {
-        box-sizing: border-box;
+        position: absolute;
+        width: 100%;
+        padding: 0 6px;
         color: var(--ion-color-medium, #6b6b80);
         font-size: 11px;
         font-weight: 600;
-        padding: 0 6px;
-        position: absolute;
         text-align: right;
-        transform: translateY(-50%);
         white-space: nowrap;
-        width: 100%;
+        box-sizing: border-box;
+        transform: translateY(-50%);
+        transform-origin: left top;
     }
 
     .timetable-lanes {
@@ -777,7 +853,7 @@ onUnmounted(
         position: absolute;
         right: 3px;
         text-align: left;
-        transition: transform 0.15s, box-shadow 0.15s;
+        transform-origin: left top;
     }
 
     .timetable-gig:active {
