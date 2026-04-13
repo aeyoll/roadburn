@@ -49,6 +49,32 @@ export interface Gig {
   sortOrder: number;
 }
 
+export interface GigStyle {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+export interface RenderedGig {
+  gig: Gig;
+  style: GigStyle;
+}
+
+export interface FavGig {
+  statusId: number;
+  status: BookmarkStatus;
+  gigs: RenderedGig[];
+}
+
+export interface GigPosition {
+  offsetStart: number;
+  offsetEnd: number;
+  startTimestamp: number;
+  endTimestamp: number;
+  width: number;
+}
+
 export type BookmarkStatus = 'none' | 'no' | 'maybe' | 'yes' | 'mandatory';
 
 export interface FestivalDashboard {
