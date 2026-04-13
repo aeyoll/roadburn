@@ -120,7 +120,7 @@ import {
     IonButton,
     modalController,
 } from '@ionic/vue';
-import type { Day, Stage, Gig, Artist, BookmarkStatus, FavGig, RenderedGig } from '@/types/festival';
+import type { Day, Stage, Gig, Artist, BookmarkStatus, GigPosition } from '@/types/festival';
 import { fetchFestivalDashboard } from '@/services/api';
 import { initBookmarks, getBookmark, getBookmarkColor, subscribeBookmarksChanged } from '@/services/bookmarks';
 import { initGigNotes, getGigNote, subscribeGigNotesChanged } from '@/services/gigNotes';
@@ -267,19 +267,11 @@ function getGigDefaultWidth(): number {
     return 1 / (2 * peakConcurrent);
 }
 
-interface GitPosition {
-    offsetStart: number;
-    offsetEnd: number;
-    startTimestamp: number;
-    endTimestamp: number;
-    width: number;
-}
-
-let cachedLayout: Map<number, GitPosition> | null = null;
+let cachedLayout: Map<number, GigPosition> | null = null;
 let cachedFavsGigsKey: string = '';
 
-function buildLayout(): Map<number, GitPosition> {
-    const gigPositions = new Map<number, GitPosition>();
+function buildLayout(): Map<number, GigPosition> {
+    const gigPositions = new Map<number, GigPosition>();
     const defaultWidth = getGigDefaultWidth();
 
     const sortedGigs = favsGigsForDay.value.slice().sort((a, b) => {
@@ -359,7 +351,7 @@ function buildLayout(): Map<number, GitPosition> {
     return gigPositions;
 }
 
-function getLayout(): Map<number, GitPosition> {
+function getLayout(): Map<number, GigPosition> {
     const key = favsGigsForDay.value.map(g => g.id).join('|');
 
     if (!cachedLayout || cachedFavsGigsKey !== key) {
